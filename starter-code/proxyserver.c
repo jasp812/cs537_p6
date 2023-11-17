@@ -13,9 +13,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 #include "proxyserver.h"
-
 
 /*
  * Constants
@@ -243,6 +241,7 @@ int main(int argc, char **argv) {
             num_workers = atoi(argv[++i]);
         } else if (strcmp("-q", argv[i]) == 0) {
             max_queue_size = atoi(argv[++i]);
+            MAX_SIZE = max_queue_size;
         } else if (strcmp("-i", argv[i]) == 0) {
             fileserver_ipaddr = argv[++i];
         } else if (strcmp("-p", argv[i]) == 0) {

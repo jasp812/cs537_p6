@@ -2,6 +2,8 @@
 #ifndef PROXYSERVER_H
 #define PROXYSERVER_H
 
+extern int MAX_SIZE;
+
 typedef enum scode {
     OK = 200,           // ok
     BAD_REQUEST = 400,  // bad request
@@ -40,6 +42,7 @@ struct http_request {
     char *method;
     char *path;
     char *delay;
+    int prio;
 };
 
 /*
@@ -127,6 +130,11 @@ struct http_request *http_request_parse(int fd) {
         read_size = read_end - read_start;
         if (read_size == 0) break;
         request->path = malloc(read_size + 1);
+
+        // Malloc out and create another copy to be used to in determining priority later
+        char *copy = malloc(read_size + 1);
+        memcpy(copy, read_start, read_size);
+
         memcpy(request->path, read_start, read_size);
         request->path[read_size] = '\0';
         printf("parsed path %s\n", request->path);
@@ -139,6 +147,15 @@ struct http_request *http_request_parse(int fd) {
         read_end++;
 
         free(read_buffer);
+
+        // Set priority for request based on directory being requested from
+        char *token = strtok(copy, "/");
+        while(!(atoi(token) <= 10 && atoi(token) >= 1) && token != NULL) {
+            token = strtok(NULL, "/");
+        }
+        int prio = atoi(token);
+        request->prio = prio;
+
         return request;
     } while (0);
 
