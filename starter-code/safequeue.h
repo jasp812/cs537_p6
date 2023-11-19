@@ -8,8 +8,8 @@ typedef struct safequeue{
     int size;
     int capacity;
     pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t empty = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t full = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t space = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t fill = PTHREAD_COND_INITIALIZER;
     struct http_request reqs[];
 };
 

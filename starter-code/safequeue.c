@@ -17,19 +17,32 @@ void create_queue() {
 
 void add_work(struct http_request req) {
     pthread_mutex_lock(&q->lock);
+    while(q->size == q->capacity) {
+        pthread_cond_wait(&q->space, &q->lock);
+    }
     insert(req);
+    pthread_cond_signal(&q->fill);
     pthread_mutex_unlock(&q->lock);
 }
 
 struct http_request get_work() {
     pthread_mutex_lock(&q->lock);
+    while(q->size == 0) {
+        pthread_cond_wait(&q->fill, &q->lock);
+    }
     struct http_request ret = extractMax();
+    pthread_cond_signal(&q->space);
     pthread_mutex_unlock(&q->lock);
     return ret;
 }
 
 struct http_request get_work_nonblocking() {
     thread_mutex_lock(&q->lock);
+    if(q->size == 0) {
+        struct http_request ret = {.delay = "", .method = "", .path = "", .prio = -1};
+        printf("Queue is currently empty\n");
+        return ret;
+    }
     struct http_request ret = extractMax();
     pthread_mutex_unlock(&q->lock);
     return ret;
