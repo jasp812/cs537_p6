@@ -1,16 +1,34 @@
 #include <pthread.h>
-#include <sys/types.h>
-#include "proxyserver.h"
-#include "safequeue.h"
+#include <arpa/inet.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include "proxyserver.h"
+#include "safequeue.h"
+
 
 struct safequeue *q;
 
-void create_queue() {
+void create_queue(int qsize) {
+    pthread_mutex_init(&q->lock, NULL);
+    pthread_cond_init(&q->space, NULL);
+    pthread_cond_init(&q->fill, NULL);
+
+
     pthread_mutex_lock(&q->lock);
-    q = malloc(sizeof(struct safequeue) + MAX_SIZE * sizeof(struct http_request));
-    q->capacity = MAX_SIZE;
+    q = malloc(sizeof(struct safequeue) + qsize * sizeof(struct http_request));
+    q->capacity = qsize;
     q->size = 0;
     pthread_mutex_unlock(&q->lock);
 }
@@ -37,7 +55,7 @@ struct http_request get_work() {
 }
 
 struct http_request get_work_nonblocking() {
-    thread_mutex_lock(&q->lock);
+    pthread_mutex_lock(&q->lock);
     if(q->size == 0) {
         struct http_request ret = {.delay = "", .method = "", .path = "", .prio = -1};
         printf("Queue is currently empty\n");
@@ -76,11 +94,13 @@ int rightChild(int i)
 // to maintain the heap property
 void shiftUp(int i)
 {
-    struct http_request requests[] = q->reqs;
-    while (i > 0 && requests[parent(i)].prio < requests[i].prio) {
+    while (i > 0 && q->reqs[parent(i)].prio < q->reqs[i].prio) {
  
         // Swap parent and current node
-        swap(requests[parent(i)], requests[i]);
+        struct http_request temp = q->reqs[parent(i)];
+        q->reqs[parent(i)] = q->reqs[i];
+        q->reqs[i] = temp;
+
  
         // Update i to parent of i
         i = parent(i);
@@ -92,25 +112,26 @@ void shiftUp(int i)
 void shiftDown(int i)
 {
     int maxIndex = i;
-    struct http_request requests[] = q->reqs;
  
     // Left Child
     int l = leftChild(i);
  
-    if (l <= q->size && requests[l].prio > requests[maxIndex].prio) {
+    if (l <= q->size && q->reqs[l].prio > q->reqs[maxIndex].prio) {
         maxIndex = l;
     }
  
     // Right Child
     int r = rightChild(i);
  
-    if (r <= q->size && requests[r].prio > requests[maxIndex].prio) {
+    if (r <= q->size && q->reqs[r].prio > q->reqs[maxIndex].prio) {
         maxIndex = r;
     }
  
     // If i not same as maxIndex
     if (i != maxIndex) {
-        swap(requests[i], requests[maxIndex]);
+        struct http_request temp = q->reqs[maxIndex];
+        q->reqs[maxIndex] = q->reqs[i];
+        q->reqs[i] = temp;
         shiftDown(maxIndex);
     }
 }
@@ -119,10 +140,10 @@ void shiftDown(int i)
 // in the Binary Heap
 void insert(struct http_request p)
 {
-    struct http_request requests[] = q->reqs;
+    
 
     q->size = q->size + 1;
-    requests[q->size] = p;
+    q->reqs[q->size] = p;
  
     // Shift Up to maintain heap property
     shiftUp(q->size);
@@ -132,12 +153,12 @@ void insert(struct http_request p)
 // maximum priority
 struct http_request extractMax()
 {
-    struct http_request requests[] = q->reqs;
-    struct http_request result = requests[0];
+    
+    struct http_request result = q->reqs[0];
  
     // Replace the value at the root
     // with the last leaf
-    requests[0] = requests[q->size];
+    q->reqs[0] = q->reqs[q->size];
     q->size = q->size - 1;
  
     // Shift down the replaced element
@@ -150,9 +171,9 @@ struct http_request extractMax()
 // of an element
 void changePriority(int i, struct http_request p)
 {
-    struct http_request requests[] = q->reqs;
-    struct http_request oldp = requests[i];
-    requests[i] = p;
+    
+    struct http_request oldp = q->reqs[i];
+    q->reqs[i] = p;
  
     if (p.prio > oldp.prio) {
         shiftUp(i);
@@ -166,22 +187,22 @@ void changePriority(int i, struct http_request p)
 // maximum element
 struct http_request getMax()
 {
-    struct http_request requests[] = q->reqs;
-    return requests[0];
+    
+    return q->reqs[0];
 }
  
 // Function to remove the element
 // located at given index
-void remove(int i)
-{
-    struct http_request requests[] = q->reqs;
-    requests[i] = getMax();
-    requests[i].prio + 1;
+// void remove(int i)
+// {
+    
+//     q->reqs[i] = getMax();
+//     q->reqs[i].prio++;
  
-    // Shift the node to the root
-    // of the heap
-    shiftUp(i);
+//     // Shift the node to the root
+//     // of the heap
+//     shiftUp(i);
  
-    // Extract the node
-    extractMax();
-}
+//     // Extract the node
+//     extractMax();
+// }

@@ -2,7 +2,6 @@
 #ifndef PROXYSERVER_H
 #define PROXYSERVER_H
 
-extern int MAX_SIZE;
 
 typedef enum scode {
     OK = 200,           // ok
@@ -204,7 +203,7 @@ struct http_request parse_client_request(int fd) {
     read_buffer[bytes_read] = '\0'; /* Always null-terminate. */
     printf("read buffer %s\n\n", read_buffer);
 
-    int delay = -1;
+    char *delay = "-1";
     int priority = -1;
     char *path = NULL;
 
@@ -237,7 +236,7 @@ struct http_request parse_client_request(int fd) {
             if (value) {
                 size = value - token - 1;  // -1 for space
                 if (strncmp("Delay", token, size) == 0) {
-                    delay = atoi(value + 2);  // skip `: `
+                    delay = value + 2;  // skip `: `
                 }
             }
         }
@@ -247,7 +246,7 @@ struct http_request parse_client_request(int fd) {
     printf("\n\tParsed HTTP request:\n");
     printf("\tPath: '%s'\n", path);
     printf("\tPriority: '%d'\n", priority);
-    printf("\tDelay: '%d'\n\n", delay);
+    printf("\tDelay: '%s'\n\n", delay);
 
     request->delay = delay;
     request->path = path;

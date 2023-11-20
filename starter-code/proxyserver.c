@@ -198,12 +198,14 @@ void *worker(void *arg) {
     struct http_request req = get_work();
 
     if(req.delay > 0) {
-        sleep(req.delay);
+        sleep(atoi(req.delay));
     }
 
     serve_request(req.fd);
     shutdown(req.fd, SHUT_WR);
     close(req.fd);
+
+    pthread_exit(NULL);
 }
 
 /*
@@ -212,13 +214,13 @@ void *worker(void *arg) {
  * connection, calls request_handler with the accepted fd number.
  */
 void serve_forever(int *server_fd) {
-    create_queue();
+    create_queue(max_queue_size);
     pthread_t listeners[num_listener];
     pthread_t workers[num_workers];
     
     // Init listener threads
     for(int i = 0; i < num_listener; i++) {
-        pthread_create(&listeners[i], NULL, listener, (void*)listener_ports[i]);
+        pthread_create(&listeners[i], NULL, listener, (void*)&listener_ports[i]);
     }
     
     // Init worker threads
@@ -228,12 +230,12 @@ void serve_forever(int *server_fd) {
 
     // Join listener threads
     for(int i = 0; i < num_listener; i++) {
-        pthread_join(&listeners[i], NULL);
+        pthread_join(listeners[i], NULL);
     }
     
     // Join worker threads
     for(int i = 0; i < num_workers; i++) {
-        pthread_join(&workers[i], NULL);
+        pthread_join(workers[i], NULL);
     }
     
 
@@ -305,7 +307,6 @@ int main(int argc, char **argv) {
             num_workers = atoi(argv[++i]);
         } else if (strcmp("-q", argv[i]) == 0) {
             max_queue_size = atoi(argv[++i]);
-            MAX_SIZE = max_queue_size;
         } else if (strcmp("-i", argv[i]) == 0) {
             fileserver_ipaddr = argv[++i];
         } else if (strcmp("-p", argv[i]) == 0) {
