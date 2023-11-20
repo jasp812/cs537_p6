@@ -14,6 +14,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "proxyserver.h"
+#include "safequeue.h"
+#include <pthread.h>
 
 /*
  * Constants
@@ -104,57 +106,52 @@ void serve_request(int client_fd) {
 
 
 int server_fd;
-/*
- * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
- * the fd number of the server socket in *socket_number. For each accepted
- * connection, calls request_handler with the accepted fd number.
- */
-void serve_forever(int *server_fd) {
 
-    // create a socket to listen
-    *server_fd = socket(PF_INET, SOCK_STREAM, 0);
-    if (*server_fd == -1) {
+void *listener(void *arg) {
+     // create a socket to listen
+    int listening_fd = socket(PF_INET, SOCK_STREAM, 0);
+    if (listening_fd == -1) {
         perror("Failed to create a new socket");
         exit(errno);
     }
 
     // manipulate options for the socket
     int socket_option = 1;
-    if (setsockopt(*server_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
+    if (setsockopt(listening_fd, SOL_SOCKET, SO_REUSEADDR, &socket_option,
                    sizeof(socket_option)) == -1) {
         perror("Failed to set socket options");
         exit(errno);
     }
 
 
-    int proxy_port = listener_ports[0];
+    int listener_port = *((int *)arg);
     // create the full address of this proxyserver
-    struct sockaddr_in proxy_address;
-    memset(&proxy_address, 0, sizeof(proxy_address));
-    proxy_address.sin_family = AF_INET;
-    proxy_address.sin_addr.s_addr = INADDR_ANY;
-    proxy_address.sin_port = htons(proxy_port); // listening port
+    struct sockaddr_in listener_address;
+    memset(&listener_address, 0, sizeof(listener_address));
+    listener_address.sin_family = AF_INET;
+    listener_address.sin_addr.s_addr = INADDR_ANY;
+    listener_address.sin_port = htons(listener_port); // listening port
 
     // bind the socket to the address and port number specified in
-    if (bind(*server_fd, (struct sockaddr *)&proxy_address,
-             sizeof(proxy_address)) == -1) {
+    if (bind(listening_fd, (struct sockaddr *)&listener_address,
+             sizeof(listener_address)) == -1) {
         perror("Failed to bind on socket");
         exit(errno);
     }
 
     // starts waiting for the client to request a connection
-    if (listen(*server_fd, 1024) == -1) {
+    if (listen(listening_fd, 1024) == -1) {
         perror("Failed to listen on socket");
         exit(errno);
     }
 
-    printf("Listening on port %d...\n", proxy_port);
+    printf("Listening on port %d...\n", listener_port);
 
     struct sockaddr_in client_address;
     size_t client_address_length = sizeof(client_address);
     int client_fd;
     while (1) {
-        client_fd = accept(*server_fd,
+        client_fd = accept(listening_fd,
                            (struct sockaddr *)&client_address,
                            (socklen_t *)&client_address_length);
         if (client_fd < 0) {
@@ -162,16 +159,65 @@ void serve_forever(int *server_fd) {
             continue;
         }
 
+
         printf("Accepted connection from %s on port %d\n",
                inet_ntoa(client_address.sin_addr),
                client_address.sin_port);
+        
+        struct http_request req = parse_client_request(client_fd);
+        req.fd =  client_fd;
+        if(strcmp(req.path, GETJOBCMD) == 0) {
+            // getJob code
+        } else {
+            add_work(req);
+        }
 
-        serve_request(client_fd);
-
-        // close the connection to the client
-        shutdown(client_fd, SHUT_WR);
-        close(client_fd);
     }
+    close(listening_fd);
+}
+
+void *worker(void *arg) {
+    struct http_request req = get_work();
+
+    if(req.delay > 0) {
+        sleep(req.delay);
+    }
+
+    serve_request(req.fd);
+    shutdown(req.fd, SHUT_WR);
+    close(req.fd);
+}
+
+/*
+ * opens a TCP stream socket on all interfaces with port number PORTNO. Saves
+ * the fd number of the server socket in *socket_number. For each accepted
+ * connection, calls request_handler with the accepted fd number.
+ */
+void serve_forever(int *server_fd) {
+    create_queue();
+    pthread_t listeners[num_listener];
+    pthread_t workers[num_workers];
+    
+    // Init listener threads
+    for(int i = 0; i < num_listener; i++) {
+        pthread_create(&listeners[i], NULL, listener, (void*)listener_ports[i]);
+    }
+    
+    // Init worker threads
+    for(int i = 0; i < num_workers; i++) {
+        pthread_create(&workers[i], NULL, worker, NULL);
+    }
+
+    // Join listener threads
+    for(int i = 0; i < num_listener; i++) {
+        pthread_join(&listeners[i], NULL);
+    }
+    
+    // Join worker threads
+    for(int i = 0; i < num_workers; i++) {
+        pthread_join(&workers[i], NULL);
+    }
+    
 
     shutdown(*server_fd, SHUT_RDWR);
     close(*server_fd);
