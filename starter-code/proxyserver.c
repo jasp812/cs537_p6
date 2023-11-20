@@ -168,6 +168,24 @@ void *listener(void *arg) {
         req.fd =  client_fd;
         if(strcmp(req.path, GETJOBCMD) == 0) {
             // getJob code
+            
+            // Remove highest prio job from queue
+            struct http_request req = get_work_nonblocking();
+
+            // If queue was empty, the returned struct will have a -1 prio, so 
+            // check that and return QUEUE_EMPTY error if so
+            if(req.prio == -1) {
+                send_error_response(req.fd, QUEUE_EMPTY, "Queue is currently empty\n");
+            }
+
+            int fd = req.fd;
+
+            http_start_response(fd, 200);
+            http_send_header(fd, "Content-Type", "text/html");
+            http_end_headers(fd);
+            http_send_string(fd, req.path);
+
+
         } else {
             add_work(req);
         }

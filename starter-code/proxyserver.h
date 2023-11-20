@@ -194,13 +194,13 @@ char *http_get_response_message(int status_code) {
 }
 
 struct http_request parse_client_request(int fd) {
-    struct http_request request = malloc(sizeof(struct http_request));
+    struct http_request *request = malloc(sizeof(struct http_request));
     if (!request) http_fatal_error("Malloc failed");
 
     char *read_buffer = malloc(LIBHTTP_REQUEST_MAX_SIZE + 1);
     if (!read_buffer) http_fatal_error("Malloc failed");
 
-    int bytes_read = recv(fd, read_buffer, MSG_PEEK);
+    int bytes_read = recv(fd, read_buffer, LIBHTTP_REQUEST_MAX_SIZE, MSG_PEEK);
     read_buffer[bytes_read] = '\0'; /* Always null-terminate. */
     printf("read buffer %s\n\n", read_buffer);
 
@@ -249,13 +249,13 @@ struct http_request parse_client_request(int fd) {
     printf("\tPriority: '%d'\n", priority);
     printf("\tDelay: '%d'\n\n", delay);
 
-    request.delay = delay;
-    request.path = path;
-    request.prio = priority;
-    request.method = "GET";
+    request->delay = delay;
+    request->path = path;
+    request->prio = priority;
+    request->method = "GET";
 
     free(read_buffer);
-    return request;
+    return *request;
 }
 
 
