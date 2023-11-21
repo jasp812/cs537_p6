@@ -13,9 +13,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "proxyserver.h"
 #include "safequeue.h"
-#include <pthread.h>
 
 /*
  * Constants
