@@ -1,4 +1,3 @@
-
 #ifndef PROXYSERVER_H
 #define PROXYSERVER_H
 
@@ -37,13 +36,13 @@ typedef enum scode {
 /*
  * Functions for parsing an HTTP request.
  */
-struct http_request {
+typedef struct http_request {
     char *method;
     char *path;
     char *delay;
     int prio;
     int fd;
-};
+} http_request;
 
 /*
  * Functions for sending an HTTP response.
