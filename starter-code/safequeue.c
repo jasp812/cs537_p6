@@ -58,6 +58,7 @@ struct element get_work_nonblocking() {
     if(q->size == 0) {
         struct element ret = {.delay = "", .method = "", .path = "", .prio = -1};
         printf("Queue is currently empty\n");
+        pthread_mutex_unlock(&q->lock);
         return ret;
     }
     struct element ret = extractMax();

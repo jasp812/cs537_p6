@@ -175,7 +175,7 @@ void *listener(void *arg) {
             // If queue was empty, the returned struct will have a -1 prio, so 
             // check that and return QUEUE_EMPTY error if so
             if(req.prio == -1) {
-                send_error_response(req.fd, QUEUE_EMPTY, "Queue is currently empty\n");
+                send_error_response(client_fd, QUEUE_EMPTY, "Queue is currently empty\n");
             }
             else{
 
@@ -236,7 +236,7 @@ void serve_forever(int *server_fd) {
     
     // Init listener threads
     for(int i = 0; i < num_listener; i++) {
-        pthread_create(&listeners[i], NULL, listener, (void*)&listener_ports[i]);
+        pthread_create(&listeners[i], NULL, listener, (void *)&listener_ports[i]);
     }
     
     // Init worker threads
