@@ -14,7 +14,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "proxyserver.h"
 #include "safequeue.h"
 
 
@@ -27,13 +26,13 @@ void create_queue(int qsize) {
 
 
     pthread_mutex_lock(&q->lock);
-    q = malloc(sizeof(struct safequeue) + qsize * sizeof(struct http_request));
+    q = malloc(sizeof(struct safequeue) + qsize * sizeof(struct element));
     q->capacity = qsize;
     q->size = 0;
     pthread_mutex_unlock(&q->lock);
 }
 
-void add_work(struct http_request req) {
+void add_work(struct element req) {
     pthread_mutex_lock(&q->lock);
     while(q->size == q->capacity) {
         pthread_cond_wait(&q->space, &q->lock);
@@ -43,25 +42,25 @@ void add_work(struct http_request req) {
     pthread_mutex_unlock(&q->lock);
 }
 
-struct http_request get_work() {
+struct element get_work() {
     pthread_mutex_lock(&q->lock);
     while(q->size == 0) {
         pthread_cond_wait(&q->fill, &q->lock);
     }
-    struct http_request ret = extractMax();
+    struct element ret = extractMax();
     pthread_cond_signal(&q->space);
     pthread_mutex_unlock(&q->lock);
     return ret;
 }
 
-struct http_request get_work_nonblocking() {
+struct element get_work_nonblocking() {
     pthread_mutex_lock(&q->lock);
     if(q->size == 0) {
-        struct http_request ret = {.delay = "", .method = "", .path = "", .prio = -1};
+        struct element ret = {.delay = "", .method = "", .path = "", .prio = -1};
         printf("Queue is currently empty\n");
         return ret;
     }
-    struct http_request ret = extractMax();
+    struct element ret = extractMax();
     pthread_mutex_unlock(&q->lock);
     return ret;
 }
@@ -97,7 +96,7 @@ void shiftUp(int i)
     while (i > 0 && q->reqs[parent(i)].prio < q->reqs[i].prio) {
  
         // Swap parent and current node
-        struct http_request temp = q->reqs[parent(i)];
+        struct element temp = q->reqs[parent(i)];
         q->reqs[parent(i)] = q->reqs[i];
         q->reqs[i] = temp;
 
@@ -129,7 +128,7 @@ void shiftDown(int i)
  
     // If i not same as maxIndex
     if (i != maxIndex) {
-        struct http_request temp = q->reqs[maxIndex];
+        struct element temp = q->reqs[maxIndex];
         q->reqs[maxIndex] = q->reqs[i];
         q->reqs[i] = temp;
         shiftDown(maxIndex);
@@ -138,7 +137,7 @@ void shiftDown(int i)
  
 // Function to insert a new element
 // in the Binary Heap
-void insert(struct http_request p)
+void insert(struct element p)
 {
     
 
@@ -151,10 +150,10 @@ void insert(struct http_request p)
  
 // Function to extract the element with
 // maximum priority
-struct http_request extractMax()
+struct element extractMax()
 {
     
-    struct http_request result = q->reqs[0];
+    struct element result = q->reqs[0];
  
     // Replace the value at the root
     // with the last leaf
@@ -169,10 +168,10 @@ struct http_request extractMax()
  
 // Function to change the priority
 // of an element
-void changePriority(int i, struct http_request p)
+void changePriority(int i, struct element p)
 {
     
-    struct http_request oldp = q->reqs[i];
+    struct element oldp = q->reqs[i];
     q->reqs[i] = p;
  
     if (p.prio > oldp.prio) {
@@ -185,7 +184,7 @@ void changePriority(int i, struct http_request p)
  
 // Function to get value of the current
 // maximum element
-struct http_request getMax()
+struct element getMax()
 {
     
     return q->reqs[0];

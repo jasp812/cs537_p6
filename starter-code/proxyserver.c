@@ -170,7 +170,7 @@ void *listener(void *arg) {
             // getJob code
             
             // Remove highest prio job from queue
-            struct http_request req = get_work_nonblocking();
+            struct element req = get_work_nonblocking();
 
             // If queue was empty, the returned struct will have a -1 prio, so 
             // check that and return QUEUE_EMPTY error if so
@@ -187,7 +187,13 @@ void *listener(void *arg) {
 
 
         } else {
-            add_work(req);
+            struct element *a = malloc(sizeof(struct element));
+            a->delay = req.delay;
+            a->fd = req.fd;
+            a->method = req.method;
+            a->path = req.path;
+            a->prio = req.prio;
+            add_work(*a);
         }
 
     }
@@ -195,7 +201,7 @@ void *listener(void *arg) {
 }
 
 void *worker(void *arg) {
-    struct http_request req = get_work();
+    struct element req = get_work();
 
     if(req.delay > 0) {
         sleep(atoi(req.delay));

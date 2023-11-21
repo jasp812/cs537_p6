@@ -1,28 +1,36 @@
 #ifndef SAFEQUEUE_H
 #define SAFEQUEUE_H
 
+struct element{
+    char *method;
+    char *path;
+    char *delay;
+    int prio;
+    int fd;
+};
+
 typedef struct safequeue{
     int size;
     int capacity;
     pthread_mutex_t lock;
     pthread_cond_t space;
     pthread_cond_t fill;
-    struct http_request reqs[];
+    struct element reqs[];
 } safequeue;
 
 extern void create_queue(int);
-extern void add_work(struct http_request);
-extern struct http_request get_work();
-extern struct http_request get_work_nonblocking();
+extern void add_work(struct element);
+extern struct element get_work();
+extern struct element get_work_nonblocking();
 extern int parent(int);
 extern int leftChild(int);
 extern int rightChild(int);
 extern void shiftUp(int);
 extern void shiftDown(int);
-extern void insert(struct http_request);
-extern struct http_request extractMax();
-extern void changePriority(int, struct http_request);
-extern struct http_request getMax();
+extern void insert(struct element);
+extern struct element extractMax();
+extern void changePriority(int, struct element);
+extern struct element getMax();
 // extern void remove(int);
 
 #endif
