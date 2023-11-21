@@ -177,13 +177,20 @@ void *listener(void *arg) {
             if(req.prio == -1) {
                 send_error_response(req.fd, QUEUE_EMPTY, "Queue is currently empty\n");
             }
+            else{
 
-            int fd = req.fd;
+                int fd = req.fd;
 
-            http_start_response(fd, 200);
-            http_send_header(fd, "Content-Type", "text/html");
-            http_end_headers(fd);
-            http_send_string(fd, req.path);
+                http_start_response(fd, 200);
+                http_send_header(fd, "Content-Type", "text/html");
+                http_end_headers(fd);
+                http_send_string(fd, req.path);
+            
+            }
+
+            shutdown(client_fd, SHUT_WR);
+            close(client_fd);
+            continue;
 
 
         } else {
@@ -201,17 +208,20 @@ void *listener(void *arg) {
 }
 
 void *worker(void *arg) {
-    struct element req = get_work();
+    while(1){
+        struct element req = get_work();
 
-    if(req.delay > 0) {
-        sleep(atoi(req.delay));
+        if(req.delay > 0) {
+            sleep(atoi(req.delay));
+        }
+
+        serve_request(req.fd);
+        shutdown(req.fd, SHUT_WR);
+        close(req.fd);
     }
 
-    serve_request(req.fd);
-    shutdown(req.fd, SHUT_WR);
-    close(req.fd);
-
     pthread_exit(NULL);
+
 }
 
 /*
