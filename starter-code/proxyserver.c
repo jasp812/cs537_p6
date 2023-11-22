@@ -49,7 +49,7 @@ void send_error_response(int client_fd, status_code_t err_code, char *err_msg) {
  * forward the fileserver response to the client
  */
 void serve_request(int client_fd) {
-
+    printf("Entering serve_request\n");
     // create a fileserver socket
     int fileserver_fd = socket(PF_INET, SOCK_STREAM, 0);
     if (fileserver_fd == -1) {
@@ -86,6 +86,7 @@ void serve_request(int client_fd) {
     } else {
         // forward the fileserver response to the client
         while (1) {
+            printf("reading bytes\n");
             int bytes_read = recv(fileserver_fd, buffer, RESPONSE_BUFSIZE - 1, 0);
             if (bytes_read <= 0) // fileserver_fd has been closed, break
                 break;
@@ -105,15 +106,18 @@ void serve_request(int client_fd) {
 }
 
 
-int server_fd;
+int *server_fd;
 
 void *listener(void *arg) {
+    printf("Entering listener\n");
      // create a socket to listen
     int listening_fd = socket(PF_INET, SOCK_STREAM, 0);
     if (listening_fd == -1) {
         perror("Failed to create a new socket");
         exit(errno);
     }
+
+
 
     // manipulate options for the socket
     int socket_option = 1;
@@ -132,6 +136,7 @@ void *listener(void *arg) {
     listener_address.sin_addr.s_addr = INADDR_ANY;
     listener_address.sin_port = htons(listener_port); // listening port
 
+    printf("Trying to bind socket...\n");
     // bind the socket to the address and port number specified in
     if (bind(listening_fd, (struct sockaddr *)&listener_address,
              sizeof(listener_address)) == -1) {
@@ -179,12 +184,12 @@ void *listener(void *arg) {
             }
             else{
 
-                int fd = req.fd;
+                // int fd = req.fd;
 
-                http_start_response(fd, 200);
-                http_send_header(fd, "Content-Type", "text/html");
-                http_end_headers(fd);
-                http_send_string(fd, req.path);
+                http_start_response(client_fd, 200);
+                http_send_header(client_fd, "Content-Type", "text/html");
+                http_end_headers(client_fd);
+                http_send_string(client_fd, req.path);
             
             }
 
@@ -200,18 +205,27 @@ void *listener(void *arg) {
             a->method = req.method;
             a->path = req.path;
             a->prio = req.prio;
-            add_work(*a);
+            if(add_work(*a) == -1) {
+                send_error_response(client_fd, QUEUE_FULL, "Queue is full\n");
+                shutdown(client_fd, SHUT_WR);
+                close(client_fd);
+            }
+
+
         }
 
     }
     close(listening_fd);
+    pthread_exit(NULL);
 }
 
 void *worker(void *arg) {
     while(1){
+        printf("Trying to get work\n");
         struct element req = get_work();
-
-        if(req.delay > 0) {
+        printf("Work retrieved\n");
+        if(atoi(req.delay) > 0) {
+            printf("Sleeping for %s\n", req.delay);
             sleep(atoi(req.delay));
         }
 
@@ -230,33 +244,40 @@ void *worker(void *arg) {
  * connection, calls request_handler with the accepted fd number.
  */
 void serve_forever(int *server_fd) {
+    printf("lajfdslkjadlskf\n");
     create_queue(max_queue_size);
     pthread_t listeners[num_listener];
     pthread_t workers[num_workers];
     
     // Init listener threads
+    printf("Creating listener threads\n");
     for(int i = 0; i < num_listener; i++) {
-        pthread_create(&listeners[i], NULL, listener, (void *)&listener_ports[i]);
+        int *listener_port = malloc(sizeof(int));
+        *listener_port = listener_ports[i];
+        pthread_create(&listeners[i], NULL, listener, (void *)listener_port);
+        
     }
     
+    printf("Creating worker threads\n");
     // Init worker threads
     for(int i = 0; i < num_workers; i++) {
         pthread_create(&workers[i], NULL, worker, NULL);
     }
 
+    printf("Joining listener threads\n");
     // Join listener threads
     for(int i = 0; i < num_listener; i++) {
         pthread_join(listeners[i], NULL);
     }
     
+    printf("Joining worker threads\n");
     // Join worker threads
     for(int i = 0; i < num_workers; i++) {
         pthread_join(workers[i], NULL);
     }
     
 
-    shutdown(*server_fd, SHUT_RDWR);
-    close(*server_fd);
+    
 }
 
 /*
@@ -290,7 +311,7 @@ void print_settings() {
 void signal_callback_handler(int signum) {
     printf("Caught signal %d: %s\n", signum, strsignal(signum));
     for (int i = 0; i < num_listener; i++) {
-        if (close(server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
+        if (close(*server_fd) < 0) perror("Failed to close server_fd (ignoring)\n");
     }
     free(listener_ports);
     exit(0);
@@ -309,6 +330,8 @@ int main(int argc, char **argv) {
 
     /* Default settings */
     default_settings();
+
+    server_fd = malloc(sizeof(int) * num_listener);
 
     int i;
     for (i = 1; i < argc; i++) {
@@ -333,8 +356,8 @@ int main(int argc, char **argv) {
         }
     }
     print_settings();
-
-    serve_forever(&server_fd);
+    printf("Calling serve_forever\n");
+    serve_forever(server_fd);
 
     return EXIT_SUCCESS;
 }

@@ -20,26 +20,35 @@
 struct safequeue *q;
 
 void create_queue(int qsize) {
+    printf("Initializing locks and conds\n");
+    q = malloc(sizeof(struct safequeue) + qsize * sizeof(struct element));
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->space, NULL);
     pthread_cond_init(&q->fill, NULL);
 
-
+    printf("Locking\n");
     pthread_mutex_lock(&q->lock);
-    q = malloc(sizeof(struct safequeue) + qsize * sizeof(struct element));
+    printf("Creating queue\n");
     q->capacity = qsize;
     q->size = 0;
+    printf("Queue created\n");
     pthread_mutex_unlock(&q->lock);
 }
 
-void add_work(struct element req) {
+struct safequeue get_queue() {
+    return *q;
+}
+
+int add_work(struct element req) {
     pthread_mutex_lock(&q->lock);
     while(q->size == q->capacity) {
-        pthread_cond_wait(&q->space, &q->lock);
+        pthread_mutex_unlock(&q->lock);
+        return -1;
     }
     insert(req);
     pthread_cond_signal(&q->fill);
     pthread_mutex_unlock(&q->lock);
+    return 0;
 }
 
 struct element get_work() {

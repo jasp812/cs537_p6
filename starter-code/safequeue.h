@@ -19,7 +19,8 @@ typedef struct safequeue{
 } safequeue;
 
 extern void create_queue(int);
-extern void add_work(struct element);
+extern struct safequeue get_queue();
+extern int add_work(struct element);
 extern struct element get_work();
 extern struct element get_work_nonblocking();
 extern int parent(int);
