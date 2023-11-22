@@ -244,7 +244,7 @@ void *worker(void *arg) {
  * connection, calls request_handler with the accepted fd number.
  */
 void serve_forever(int *server_fd) {
-    printf("lajfdslkjadlskf\n");
+    printf("Entering serve_forever\n");
     create_queue(max_queue_size);
     pthread_t listeners[num_listener];
     pthread_t workers[num_workers];
@@ -252,9 +252,7 @@ void serve_forever(int *server_fd) {
     // Init listener threads
     printf("Creating listener threads\n");
     for(int i = 0; i < num_listener; i++) {
-        int *listener_port = malloc(sizeof(int));
-        *listener_port = listener_ports[i];
-        pthread_create(&listeners[i], NULL, listener, (void *)listener_port);
+        pthread_create(&listeners[i], NULL, listener, (void *)&listener_ports[i]);
         
     }
     
